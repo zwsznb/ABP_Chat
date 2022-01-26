@@ -1,0 +1,30 @@
+.custom-flex{
+   display: flex;
+}
+.custom-flex-align-center{
+    display: flex;
+    align-items: center;
+}
+.custom-flex-justify-center{
+    display: flex;
+    justify-content: center;
+}
+.custom-flex-center{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.custom-flex-between{
+    display: flex;
+    justify-content: space-between;
+}
+.custom-flex-column{
+    display: flex;
+    flex-direction: column;
+}
+.custom-flex-align{
+    align-items: center;
+}
+.custom-flex-justify{
+    justify-content: center;
+}

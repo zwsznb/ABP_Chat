@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+</head>
+
+<style>
+	div #log p {
+		margin: 0 auto;
+	}
+
+	div #log pre {
+		margin: 0;
+	}
+
+	@keyframes nurmal {
+		from {
+			box-shadow: 0px 0px 4px rgb(0, 255, 76);
+			opacity: .09;
+		}
+
+		to {
+			opacity: 1;
+			box-shadow: 0px 0px 16px rgb(0, 255, 76);
+		}
+	}
+
+	.nurmal {
+		width: 20px;
+		height: 20px;
+		background: rgb(0, 255, 76);
+		border-radius: 50%;
+		box-shadow: 0px 0px 16px rgb(0, 255, 76);
+		animation: nurmal .3s ease-in-out 4 alternate;
+		position: absolute;
+		right: 35px;
+	}
+
+	@keyframes error {
+		from {
+			box-shadow: 0px 0px 4px #F00;
+			opacity: .09;
+		}
+
+		to {
+			opacity: 1;
+			box-shadow: 0px 0px 16px #F00;
+		}
+	}
+
+	.error {
+		width: 20px;
+		height: 20px;
+		background: #F00;
+		border-radius: 50%;
+		box-shadow: 0px 0px 16px #F00;
+		animation: error .3s ease-in-out infinite alternate;
+		position: absolute;
+		right: 35px;
+	}
+
+	@keyframes warning {
+		from {
+			box-shadow: 0px 0px 4px rgb(255, 238, 0);
+			opacity: .09;
+		}
+
+		to {
+			opacity: 1;
+			box-shadow: 0px 0px 16px rgb(255, 238, 0);
+		}
+	}
+
+	.warning {
+		width: 20px;
+		height: 20px;
+		background: rgb(217, 255, 0);
+		border-radius: 50%;
+		box-shadow: 0px 0px 16px rgb(255, 238, 0);
+		animation: warning .3s ease-in-out infinite alternate;
+		position: absolute;
+		right: 35px;
+	}
+
+	.custom-flex-center {
+		display: flex;
+		align-items: center;
+	}
+
+	.custom-flex-justify-center {
+		justify-content: center;
+	}
+
+	.btn-common {
+		width: 50px;
+		height: 30px;
+		margin-left: 10px;
+		border-radius: 4px;
+		cursor: pointer;
+	}
+
+	.btn-search {
+		background: greenyellow;
+		border: 1px solid rgba(0, 0, 0, .05);
+	}
+
+	.btn-clear {
+		background: red;
+		border: 1px solid rgba(0, 0, 0, .09);
+	}
+
+	.btn-search-text {
+		font-size: 13px;
+		color: rgba(0, 0, 0, .5);
+	}
+
+	.btn-clear-text {
+		font-size: 13px;
+		color: white;
+	}
+
+	.filter-input {
+		outline: none;
+		border: none;
+		width: 195px;
+		font-size: 16px;
+		background-color: transparent;
+	}
+
+	.content-box {
+		background: #000;
+		overflow: auto;
+		position: absolute;
+		top: 0;
+		left: 0;
+		bottom: 0;
+		right: 0;
+	}
+
+	.content-text {
+		margin: 10px;
+		color: #6cff00;
+		font-weight: 300;
+		font-size: 15px;
+	}
+
+	.top {
+		background: #FFF;
+		height: 50px;
+		padding-left: 10px;
+		position: fixed;
+		width: 100%;
+		top: 0;
+		z-index: 9999;
+		left: 0;
+	}
+
+	.input-box {
+		border: 1px solid rgba(0, 0, 0, .2);
+		margin-left: 30px;
+		width: 200px;
+		height: 30px;
+		padding: 0 5px;
+		background: rgba(0, 0, 0, .05);
+	}
+
+	.title {
+		font-size: 20px;
+		margin-left: 20px;
+	}
+</style>
+
+<body>
+	<div class="custom-flex-center top">
+		<img src="./1638893641(1).png" />
+		<span class="title">serilog浏览器控制台</span>
+		<div class="custom-flex-center input-box">
+			<input id="input" class="filter-input" />
+		</div>
+
+		<div id="search" class="custom-flex-center custom-flex-justify-center btn-common btn-search">
+			<span class="btn-search-text">search</span></div>
+		<div id="clear" class="custom-flex-center custom-flex-justify-center btn-common btn-clear">
+			<span class="btn-clear-text">clear</span></div>
+		<div id="light" class="nurmal"></div>
+	</div>
+	<div class="content-box" id="content">
+		<div style="height: 50px;"></div>
+		<div id="log">
+		</div>
+	</div>
+	<script>
+		//储存所有的log
+		let logDataList = [];
+		let url = 'ws://localhost:5000/BrowerLog';
+		let ws = null;
+		let isConnect = false;
+		//用来控制重连方法执行玩了才进行下一次重连
+		let lock = false;
+		//方法字典，给接受的数据进行调用
+		let methodDic = {
+			//心跳，分成三个类型，warning,exception,info
+			"ReceiveLog": (msg) => {
+				logDataList.push(msg);
+				outputInfo(msg);
+				changeLogCountStatus()
+			}
+		};
+		init();
+		//创建websocket
+		function init() {
+			// 打开一个 web socket
+			try {
+				ws = new WebSocket(url);
+				connect();
+			} catch (e) {
+				//如果出错了就要重连
+				reconnect();
+			}
+		}
+		//连接固定步骤
+		function connect() {
+			//要保证连接
+			ws.onopen = () => {
+				// Web Socket 已连接上，使用 send() 方法发送数据
+				ws.send(`{"protocol":"json", "version":1}${String.fromCharCode(0x1e)}`);
+				console.log('数据发送中...');
+				//重置心跳
+				heartCheck.start();
+			};
+			ws.onmessage = (evt) => {
+				//重置心跳
+				heartCheck.start();
+				var received_msg = evt.data.split(String.fromCharCode(0x1e));
+				// console.log(received_msg);
+				//如果到的信息为空且没有数据类型,则不往下执行,说明连接成功，
+				//这里可能还有一种情况没有考虑进去，signalr本身好像是会不停的发信息给客户端来确认当前用户是否保持连接，应该就是心跳
+				//这个应该在客户端进行判断，type为6
+				received_msg.forEach(data => {
+					if (data === '{}' || data === '' || data.length === 0) {
+						//有信息回来说明连接成功，这个可能放到onopen里更合适
+						isConnect = true;
+						return;
+					}
+					let msg = JSON.parse(data);
+					//这里只能根据特定情况做特定处理
+					if (msg.type === 1) {
+						//根据方法字典调用方法
+						methodDic[msg.target](...msg.arguments);
+					}
+				});
+			};
+			ws.onerror = () => {
+				console.log("socket连接失败,尝试重连");
+				isConnect = false;
+				reconnect();
+			};
+			ws.onclose = () => {
+				// 关闭 websocket是要尝试重连
+				console.log("连接已关闭...,尝试重连");
+				isConnect = false;
+				reconnect();
+			};
+		}
+		//重连
+		function reconnect() {
+			//如果没有成功连接才进行重连,并且锁是开着的
+			console.log(lock ? '锁住了，不执行重连' : '没有锁，开始执行重连');
+			if (!isConnect && !lock) {
+				//进来之后应该先把锁打开
+				lock = true;
+				//多久重连一次呢	,暂定两秒一次
+				//要控制不让多个重连方法同时进来，那要怎么做呢
+				setTimeout(() => {
+					init();
+					//执行完之后要把锁打开
+					lock = false;
+				}, 2000);
+			}
+		}
+		//发送消息
+		function sendMessage() {
+			//连接状态才能发送消息
+			var user = document.getElementById("userInput").value;
+			var message = document.getElementById("messageInput").value;
+			if (isConnect) {
+				if (user.length === 0 || message.length === 0) {
+					return;
+				}
+				//发送数据
+				ws.send(
+					`${JSON.stringify({ "arguments": [user, message], "invocationId": "0", "streamIds": [], "target": "SendMessage", "type": 1 })}${String.fromCharCode(0x1e)}`
+				);
+			}
+		}
+
+		//心跳检测，复制博客里的写法，这里用的就很巧妙了,
+		//就是在不断重置，在接收信息的同时重置心跳的计时器，
+		//如果没有重置，那就说明服务器端断连或者出错，就会关闭连接，这个是可以使用的
+		var heartCheck = {
+			//每隔几秒测试一下心跳是否在继续
+			timeout: 1000,
+			timeoutObj: null,
+			serverTimeoutObj: null,
+			start: function () {
+				var self = this;
+				this.timeoutObj && clearTimeout(this.timeoutObj);
+				this.serverTimeoutObj && clearTimeout(this.serverTimeoutObj);
+				this.timeoutObj = setTimeout(function () {
+					//这里发送一个心跳，后端收到后，返回一个心跳消息，
+					// console.log('发送消息，测试后台是否运行中...');
+					//任意发一个消息过去，后台接收，在init()中的onmessage收到消息，说明后台没有挂掉，有心跳
+					ws.send(
+						`${JSON.stringify({ "arguments": ['心跳'], "invocationId": "0", "streamIds": [], "target": "Hearbeat", "type": 1 })}${String.fromCharCode(0x1e)}`
+					);
+					self.serverTimeoutObj = setTimeout(function () {
+						console.log("后台挂掉，没有心跳了....");
+						ws.close();
+					}, self.timeout);
+
+				}, this.timeout)
+			}
+		};
+
+
+
+
+		//监听窗口关闭事件，当窗口关闭时，主动去关闭webSocket连接，防止连接还没断开就关闭窗口，server端会抛异常
+		window.onbeforeunload = () => {
+			ws.onclose();
+		};
+		let style = {
+			INF: '#FFF',
+			ERR: '#FF0000',
+			WRN: '#FFFF00'
+		};
+		function getInfoType(info) {
+			let infoType = 'INF';
+			if (info.includes('INF')) {
+				infoType = 'INF';
+			}
+			if (info.includes('ERR') || info.includes('Exception')) {
+				infoType = 'ERR';
+			}
+			if (info.includes('WRN')) {
+				infoType = 'WRN';
+			}
+			return infoType;
+		}
+		//输出信息
+		function outputInfo(info) {
+			let div = $('#log');
+			//判断输出什么颜色的元素
+			div.append(`<pre style='color: ${style[getInfoType(info)]}'>` + info + "</pre>");
+			console.log(div.height());
+			$('#content').animate({
+				scrollTop: div.height() + 'px'
+			}, 200)
+		}
+		function changeLogCountStatus() {
+			if (logDataList.length < 100) {
+				$('#light').attr('class', 'nurmal');
+			} else if (logDataList.length > 100 && logDataList.length < 150) {
+				$('#light').attr('class', 'warning');
+			} else if (logDataList.length > 150) {
+				$('#light').attr('class', 'error');
+			}
+		}
+	</script>
+	<script src="https://cdn.bootcdn.net/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+	<script>
+		$('#search').click(() => {
+			let inputMsg = $('input').val();
+			if (inputMsg.length > 0) {
+				clearList();
+				logDataList.forEach(data => {
+					if (data.includes(inputMsg)) {
+						outputInfo(data);
+					}
+				})
+			}
+		});
+		$('#clear').click(() => {
+			clearList();
+			logDataList = [];
+			changeLogCountStatus();
+		});
+		function clearList() {
+			$('#log').empty();
+		}
+	</script>
+</body>
+
+</html>
+
+</body>
+
+</html>

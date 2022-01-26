@@ -1,0 +1,8 @@
+logs/*
+bin/*
+obj/
+[Bb]in
+[Dd]ebug*/
+.vs/
+node_modules/
+logs/
